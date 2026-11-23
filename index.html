@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Athari Althomali · Pixel Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#2a1a22;--paper:#fff6f8;--accent:#b3243a;--pink:#f3c6d3;--edge:#0d0910}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#1b1320;overflow:hidden;font-family:'Press Start 2P','Courier New',monospace;color:var(--ink)}
+#app{display:flex;flex-direction:column;height:100%}
+#stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#controls{flex:0 0 auto;width:100%;max-width:760px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;
+  padding:14px 18px calc(16px + env(safe-area-inset-bottom));user-select:none;-webkit-user-select:none;touch-action:none}
+.pad{display:flex;gap:12px}
+.btn{font-family:inherit;font-size:16px;width:64px;height:64px;border:4px solid var(--edge);background:var(--pink);color:var(--ink);
+  box-shadow:inset -4px -4px 0 #d98ea6,inset 4px 4px 0 #fff0f4;cursor:pointer;touch-action:none}
+.btn.on{box-shadow:inset 4px 4px 0 #d98ea6;transform:translateY(2px)}
+.btn.hit{width:104px;background:var(--accent);color:#fff;font-size:14px;box-shadow:inset -4px -4px 0 #7a1526,inset 4px 4px 0 #e0566c}
+.btn.hit.on{box-shadow:inset 4px 4px 0 #7a1526}
+.keys{color:#a88a9a;font-size:8px;text-align:center;line-height:1.8;flex:1;padding:0 8px}
+@media (hover:none){.keys{display:none}}
+
+#overlay{position:fixed;inset:0;background:rgba(20,8,18,.62);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+#overlay.show{display:flex}
+.win{background:var(--paper);border:4px solid var(--edge);box-shadow:0 0 0 4px var(--pink),0 0 0 8px var(--edge);
+  width:min(540px,100%);max-height:84vh;display:flex;flex-direction:column;animation:pop .18s steps(3)}
+@keyframes pop{from{transform:scale(.6)}to{transform:scale(1)}}
+.bar{background:var(--accent);color:#fff;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11px;border-bottom:4px solid var(--edge)}
+.x{font-family:inherit;background:#fff;border:3px solid var(--edge);width:30px;height:30px;font-size:11px;cursor:pointer;color:var(--ink)}
+.body{padding:18px 16px;overflow:auto;font-size:10px;line-height:2}
+.body p{margin-bottom:12px}
+.list button{display:block;width:100%;text-align:left;font-family:inherit;font-size:10px;line-height:1.6;padding:12px;margin-bottom:10px;background:#fff;
+  border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge);cursor:pointer;color:var(--ink)}
+.list button:hover{background:#fbe1e9}
+.list button::before{content:"▸ ";color:var(--accent)}
+.pbtn{display:inline-block;font-family:inherit;font-size:10px;padding:12px 14px;margin:4px 8px 8px 0;background:var(--accent);color:#fff;text-decoration:none;
+  border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge);cursor:pointer}
+.pbtn.alt{background:#2c3a70}
+.back{font-family:inherit;font-size:9px;background:none;border:none;color:var(--accent);cursor:pointer;margin-bottom:14px;padding:0}
+.tag{display:inline-block;font-size:8px;background:var(--pink);border:2px solid var(--edge);padding:4px 6px;margin-bottom:12px}
+.mail{user-select:text;-webkit-user-select:text;word-break:break-all;background:#fff;border:3px dashed #d98ea6;padding:10px;margin:6px 0 10px}
+h3{font-size:11px;margin-bottom:12px;color:var(--accent);line-height:1.6}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"><canvas id="game" aria-label="Pixel game: walk and hit the signs"></canvas></div>
+  <div id="controls">
+    <div class="pad">
+      <button class="btn" id="bL" aria-label="Walk left">◀</button>
+      <button class="btn" id="bR" aria-label="Walk right">▶</button>
+    </div>
+    <div class="keys">← → WALK<br>SPACE HIT</div>
+    <button class="btn hit" id="bH" aria-label="Hit">HIT!</button>
+  </div>
+</div>
+<div id="overlay" role="dialog" aria-modal="true">
+  <div class="win">
+    <div class="bar"><span id="wTitle"></span><button class="x" id="wClose" aria-label="Close">X</button></div>
+    <div class="body" id="wBody"></div>
+  </div>
+</div>
+
+<script>
+/* ================= CONTENT ================= */
+const EMAIL = "athari.althomali@gmail.com";
+const LINKEDIN = "https://www.linkedin.com/in/athari-althomali-a12142363";
+const GH = "https://github.com/athari19/";
+
+const PROJECTS = [
+  {name:"Disability Services Gap", repo:"fajwa-disability-services-gap",
+   desc:"Hackathon project analysing disability services in Saudi Arabia (home care, rehabilitation and care centres) using public data."},
+  {name:"Heart Disease Prediction", repo:"heart-disease-prediction",
+   desc:"Predicts heart disease with Logistic Regression and Random Forest. Group project: I wrote the code and the evaluation."},
+  {name:"Social Media Addiction Analysis", repo:"social-media-addiction-analysis",
+   desc:"A full data preprocessing pipeline on a survey of 705 students. Group project."},
+  {name:"Saudi Art Museum Database", repo:"Saudi-Art-Museum-Database",
+   desc:"Relational database for an art museum: ER diagram, schema and SQL queries. Group project."},
+  {name:"PageTurn Library", repo:"Pageturn-library",
+   desc:"Online book-borrowing website built with Flask and SQLite, with Google Analytics. Group project."}
+];
+
+const SKILLS = [
+  {name:"Python", repo:"heart-disease-prediction",
+   desc:"My main language. I wrote the full Python code for a heart disease prediction model using pandas and scikit-learn."},
+  {name:"Machine Learning", repo:"heart-disease-prediction",
+   desc:"Trained Logistic Regression and Random Forest classifiers and evaluated them with F1-score, AUC-ROC and cross-validation."},
+  {name:"Data Cleaning & Preprocessing", repo:"social-media-addiction-analysis",
+   desc:"Handled outliers with IQR capping, compared Min-Max, Standard and Robust scaling, encoded and engineered features, and applied RFE and PCA."},
+  {name:"Data Analysis", repo:"fajwa-disability-services-gap",
+   desc:"Collected public data on disability services in Saudi Arabia and analysed it in a Jupyter notebook for a non-profit data hackathon."},
+  {name:"SQL & Database Design", repo:"Saudi-Art-Museum-Database",
+   desc:"Designed a relational database from an ER diagram: schema, DDL/DML, joins, subqueries, aggregate functions and views."},
+  {name:"Flask & Web Development", repo:"Pageturn-library",
+   desc:"Built a book-borrowing web app with Flask and SQLite, deployed it on PythonAnywhere and connected Google Analytics."}
+];
+const projName = r => (PROJECTS.find(p=>p.repo===r)||{name:r}).name;
+const esc = s => s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ================= COPY ================= */
+function copyEmail(btn){
+  const done=()=>{btn.textContent="COPIED!";setTimeout(()=>btn.textContent="COPY",1500);};
+  const fallback=()=>{
+    let ok=false;
+    try{const ta=document.createElement('textarea');ta.value=EMAIL;ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);
+      ta.focus();ta.select();ta.setSelectionRange(0,EMAIL.length);ok=document.execCommand('copy');ta.remove();}catch(_){}
+    if(ok) return done();
+    const m=document.querySelector('.mail'); if(m){const r=document.createRange();r.selectNodeContents(m);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);}
+    btn.textContent="SELECTED, COPY IT";
+  };
+  try{ navigator.clipboard.writeText(EMAIL).then(done,fallback); }catch(_){ fallback(); }
+}
+/* ================= MODAL ================= */
+const overlay=document.getElementById('overlay'), wTitle=document.getElementById('wTitle'), wBody=document.getElementById('wBody');
+let modalOpen=false;
+function openWin(title, html){ wTitle.textContent=title; wBody.innerHTML=html; overlay.classList.add('show'); modalOpen=true; keys.l=keys.r=false; wBody.scrollTop=0; }
+function closeWin(){ overlay.classList.remove('show'); modalOpen=false; }
+document.getElementById('wClose').onclick=closeWin;
+overlay.addEventListener('click',e=>{ if(e.target===overlay) closeWin(); });
+
+function showAbout(){
+  openWin("ABOUT ME",`
+    <p>Hi! I'm <b>Athari Althomali</b> 👋</p>
+    <p>Data Science student at <b>Umm Al-Qura University</b>, Class of 2028.</p>
+    <p>I enjoy turning raw, messy data into clear insights: cleaning it, exploring it, and building machine learning models on top of it.</p>
+    <p>Currently looking for a <b>co-op training</b> opportunity.</p>
+    <h3>✉ CONTACT ME</h3>
+    <div class="mail">${EMAIL}</div>
+    <a class="pbtn" href="https://mail.google.com/mail/?view=cm&fs=1&to=${EMAIL}" target="_blank" rel="noopener">SEND EMAIL</a><button class="pbtn alt" id="copyMail">COPY</button>
+    <p style="font-size:8px;margin-top:6px">Other mail app? <a href="mailto:${EMAIL}" target="_top" style="color:#b3243a">Open it here</a></p>`);
+  document.getElementById('copyMail').onclick=e=>copyEmail(e.currentTarget);
+}
+function showLinkedIn(){
+  openWin("LINKEDIN",`
+    <p>Let's connect! 🤝</p>
+    <p>See my education, projects and experience on LinkedIn.</p>
+    <a class="pbtn" href="${LINKEDIN}" target="_blank" rel="noopener">OPEN MY LINKEDIN ↗</a>`);
+}
+function showSkills(){
+  openWin("SKILLS",`<p>Tap a skill to see how I used it:</p><div class="list">${
+    SKILLS.map((s,i)=>`<button data-i="${i}">${esc(s.name)}</button>`).join('')}</div>`);
+  wBody.querySelectorAll('.list button').forEach(b=>b.onclick=()=>{
+    const s=SKILLS[+b.dataset.i];
+    wBody.innerHTML=`<button class="back">◀ BACK TO SKILLS</button>
+      <h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p>
+      <span class="tag">USED IN: ${esc(projName(s.repo))}</span><br>
+      <a class="pbtn" href="${GH+s.repo}" target="_blank" rel="noopener">VIEW PROJECT ↗</a>`;
+    wBody.querySelector('.back').onclick=showSkills; wBody.scrollTop=0;
+  });
+}
+function showProjects(){
+  openWin("PROJECTS",`<p>Tap a project:</p><div class="list">${
+    PROJECTS.map((p,i)=>`<button data-i="${i}">${esc(p.name)}</button>`).join('')}</div>`);
+  wBody.querySelectorAll('.list button').forEach(b=>b.onclick=()=>{
+    const p=PROJECTS[+b.dataset.i];
+    wBody.innerHTML=`<button class="back">◀ BACK TO PROJECTS</button>
+      <h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p>
+      <a class="pbtn" href="${GH+p.repo}" target="_blank" rel="noopener">OPEN ON GITHUB ↗</a>`;
+    wBody.querySelector('.back').onclick=showProjects; wBody.scrollTop=0;
+  });
+}
+
+/* ================= PIXEL FONT 5x7 ================= */
+const F={
+A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01110100011000010000100001000101110",
+D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",
+G:"01110100011000010111100011000101111",H:"10001100011000111111100011000110001",I:"01110001000010000100001000010001110",
+J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",
+M:"10001110111010110101100011000110001",N:"10001100011100110101100111000110001",O:"01110100011000110001100011000101110",
+P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",
+S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",
+V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",
+Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111",
+"0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111",
+"3":"11110000010000101110000010000111110","4":"00010001100101010010111110001000010","5":"11111100001111000001000011000101110",
+"6":"00110010001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110",
+"9":"01110100011000101111000010001001100"," ":"00000000000000000000000000000000000",
+"!":"00100001000010000100001000000000100",".":"00000000000000000000000000110001100","-":"00000000000000011111000000000000000",
+"'":"00100001000100000000000000000000000",">":"01000001000001000001000100010001000","<":"00010001000100010000010000010000010",
+"?":"01110100010000100010001000000000100"
+};
+function textW(s,sc=1){return (s.length*6-1)*sc}
+function drawText(s,x,y,sc,col,align='left'){
+  s=s.toUpperCase(); if(align==='center') x-=textW(s,sc)/2; x=Math.round(x); y=Math.round(y);
+  ctx.fillStyle=col;
+  for(let i=0;i<s.length;i++){const g=F[s[i]]||F['?'];
+    for(let r=0;r<7;r++)for(let c=0;c<5;c++) if(g[r*5+c]==='1') ctx.fillRect(x+(i*6+c)*sc,y+r*sc,sc,sc);}
+}
+function drawOutlined(s,x,y,sc,col,out,align){
+  for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]]) drawText(s,x+dx,y+dy,sc,out,align);
+  drawText(s,x,y,sc,col,align);
+}
+
+/* ================= SPRITES ================= */
+const PAL={K:'#141016',H:'#43384d',G:'#2c3a70',Q:'#e0587a',k:'#1c1014',S:'#fbe3dc',P:'#f4a3b8',E:'#6f93b3',W:'#ffffff',D:'#2c3a70',C:'#f3f0f6',
+           M:'#1d2449',L:'#3a2218',R:'#b3243a',m:'#c9566b'};
+const TOP=[
+"....GGGGGGGG....","...G.KKKKKK.G...","..GKKHHKKKKKKG..","..GKHKKKKKKKKG..","..GHKKKKKKKKKKG.",
+".QQKKKSKKKSKKQQ.",".QQKSSSSSSSSKQQ.",".QQSkkkSSkkkSQQ.",".KKSSEWSSWESSKK.",".KKPSEESSEESPKK.","KKKKSSSmSSSSKKKK",
+"KHKK..SSSS..KKHK","KKHK.DDDDDD.KHKK","KHKKDDCDDCDDKKHK",".KHKDDDDDDDDKHK.",".KKHDDDDDDDDHKK.",
+"..KKSDDDDDDSKK..","...HKMMMMMMKH...","...KMMMMMMMMK...","....MMMMMMMM...."];
+const LEG_A=[".....SS..SS.....",".....SS..SS.....",".....LL..LL....."];
+const LEG_B=["....SS....SS....","...SS......SS...","...LL......LL..."];
+const LEG_C=["......SSSS......","......SSSS......","......LLLL......"];
+function mk(rows,extra){
+  const w=22,h=rows.length,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+  rows.forEach((r,y)=>{for(let x=0;x<r.length;x++){const ch=r[x];if(PAL[ch]){g.fillStyle=PAL[ch];g.fillRect(x,y,1,1);}}});
+  if(extra) extra(g);
+  return c;
+}
+const blink=rows=>rows.map((r,i)=>i===7?".QQSSSSSSSSSSQQ.":i===8?".KKSkkkSSkkkSKK.":i===9?".KKPSSSSSSSSPKK.":r);
+const punchArm=g=>{g.fillStyle=PAL.D;g.fillRect(12,14,6,2);g.fillStyle=PAL.S;g.fillRect(18,13,3,4);g.fillStyle=PAL.k;g.fillRect(21,13,1,4);g.fillRect(18,12,3,1);g.fillRect(18,17,3,1);};
+const SPR={
+  idle:mk(TOP.concat(LEG_A)), blink:mk(blink(TOP).concat(LEG_A)),
+  walk1:mk(TOP.concat(LEG_B)), walk2:mk(TOP.concat(LEG_C)),
+  punch:mk(TOP.concat(LEG_B),punchArm)
+};
+
+/* ================= GAME ================= */
+const cvs=document.getElementById('game'), ctx=cvs.getContext('2d');
+let W=320, H=180, GY=150; const WORLD=1160;
+function resize(){
+  const st=document.getElementById('stage'), aw=st.clientWidth, ah=st.clientHeight;
+  const ratio=aw/Math.max(ah,1);
+  if(ratio>=1.2){ H=180; W=Math.round(Math.min(400,H*ratio)); }
+  else { W=200; H=Math.round(Math.max(180,Math.min(320,W/ratio))); }
+  GY=H-30;
+  cvs.width=W; cvs.height=H; ctx.imageSmoothingEnabled=false;
+  const s=Math.min(aw/W, ah/H);
+  cvs.style.width=Math.floor(W*s)+'px'; cvs.style.height=Math.floor(H*s)+'px';
+}
+addEventListener('resize',resize);
+
+const signs=[
+  {x:240,label:"ABOUT ME",open:showAbout,shake:0},
+  {x:450,label:"LINKEDIN",open:showLinkedIn,shake:0},
+  {x:660,label:"SKILLS",open:showSkills,shake:0},
+  {x:870,label:"PROJECTS",open:showProjects,shake:0}
+];
+const FLAG_X=1070;
+const p={x:60,face:1,walkT:0,punchT:0,moving:false};
+const keys={l:false,r:false};
+let parts=[], pows=[], t=0, cam=0, moved=false, blinkT=2.5;
+
+function nearSign(){return signs.find(s=>Math.abs(s.x-p.x)<30);}
+function hit(){
+  if(modalOpen||p.punchT>0) return;
+  const s=nearSign();
+  if(s) p.face = s.x>=p.x?1:-1;
+  p.punchT=.28;
+  const fx=p.x+p.face*12, fy=GY-14;
+  if(s){
+    s.shake=.4; pows.push({x:fx,y:fy-10,life:.6});
+    for(let i=0;i<14;i++) parts.push({x:fx,y:fy,vx:(Math.random()-.5)*120,vy:-Math.random()*110-20,life:.6+Math.random()*.3,
+      c:['#ffd447','#ffffff','#f29bb0','#b3243a'][i%4]});
+    setTimeout(()=>s.open(),300);
+  } else {
+    for(let i=0;i<4;i++) parts.push({x:fx,y:fy,vx:p.face*(30+Math.random()*40),vy:-Math.random()*40,life:.25,c:'#ffffff'});
+  }
+}
+
+function update(dt){
+  t+=dt;
+  let vx=0;
+  if(!modalOpen && p.punchT<=0){ if(keys.l)vx-=1; if(keys.r)vx+=1; }
+  if(vx){ p.face=vx; moved=true; }
+  p.moving=!!vx;
+  p.x=Math.max(16,Math.min(WORLD-16,p.x+vx*78*dt));
+  p.walkT = vx? p.walkT+dt : 0;
+  if(p.punchT>0) p.punchT-=dt;
+  blinkT-=dt; if(blinkT< -0.12) blinkT=2+Math.random()*3;
+  signs.forEach(s=>{ if(s.shake>0) s.shake-=dt; });
+  parts.forEach(q=>{q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=260*dt;q.life-=dt;}); parts=parts.filter(q=>q.life>0);
+  pows.forEach(q=>{q.y-=18*dt;q.life-=dt;}); pows=pows.filter(q=>q.life>0);
+  const target=Math.max(0,Math.min(WORLD-W,p.x-W*0.38));
+  cam+= (target-cam)*Math.min(1,dt*8);
+}
+
+/* ---- background helpers ---- */
+const SKY=['#f6cfdc','#f8d7e2','#f9dee7','#fbe5ec','#fcecf1','#fdf2f5'];
+function rnd(i){const x=Math.sin(i*127.1)*43758.5453;return x-Math.floor(x);}
+function cloud(x,y){ctx.fillStyle='#ffffff';ctx.fillRect(x+4,y,14,4);ctx.fillRect(x,y+3,26,5);ctx.fillRect(x+8,y-3,8,4);
+  ctx.fillStyle='#f3dbe4';ctx.fillRect(x,y+7,26,1);}
+function bush(x,y){ctx.fillStyle='#4f7a46';ctx.fillRect(x,y-6,18,6);ctx.fillRect(x+3,y-10,12,4);ctx.fillRect(x+6,y-12,6,2);
+  ctx.fillStyle='#6d9b5f';ctx.fillRect(x+4,y-9,4,2);ctx.fillRect(x+2,y-5,3,2);ctx.fillStyle='#f29bb0';ctx.fillRect(x+12,y-7,2,2);}
+function tree(x,y){ctx.fillStyle='#6b4226';ctx.fillRect(x+7,y-14,4,14);
+  ctx.fillStyle='#e7a3b8';ctx.fillRect(x,y-30,18,14);ctx.fillRect(x+3,y-34,12,4);ctx.fillRect(x-2,y-26,22,8);
+  ctx.fillStyle='#f6c4d2';ctx.fillRect(x+3,y-31,6,4);ctx.fillRect(x+1,y-25,4,3);ctx.fillStyle='#cf839b';ctx.fillRect(x+12,y-20,6,3);}
+
+function drawBG(){
+  const bh=Math.ceil(GY/SKY.length);
+  SKY.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(0,i*bh,W,bh);});
+  // clouds
+  for(let i=0;i<8;i++){const sx=((i*170+20-cam*0.25-t*4)%1360+1360)%1360-40; if(sx<W+40) cloud(Math.round(sx),GY-104+(i%3)*14);}
+  // far hills
+  ctx.fillStyle='#ecbccb';
+  for(let x=0;x<W;x+=2){const wx=x+cam*0.35;const h=22+Math.round(Math.sin(wx/37)*8+Math.sin(wx/13)*3);ctx.fillRect(x,GY-h-8,2,h+8);}
+  ctx.fillStyle='#dca0b4';
+  for(let x=0;x<W;x+=2){const wx=x+cam*0.55;const h=12+Math.round(Math.sin(wx/29+1)*6);ctx.fillRect(x,GY-h,2,h);}
+  // trees / bushes
+  for(let i=0;i<30;i++){const wx=i*90+rnd(i+9)*40; const sx=Math.round(wx-cam*0.8);
+    if(sx<-30||sx>W+30) continue; (i%2?bush:tree)(sx,GY);}
+  // ground
+  const off=Math.round(cam);
+  ctx.fillStyle='#7fb069';ctx.fillRect(0,GY,W,4);
+  ctx.fillStyle='#5e8c4a';ctx.fillRect(0,GY+4,W,2);
+  ctx.fillStyle='#a9744f';ctx.fillRect(0,GY+6,W,H-GY-6);
+  ctx.fillStyle='#8a5a3b';
+  for(let x=-(off%16);x<W;x+=16){ctx.fillRect(x+3,GY+10,3,2);ctx.fillRect(x+11,GY+17,2,2);ctx.fillRect(x+6,GY+24,3,1);}
+  ctx.fillStyle='#9fcf86';
+  for(let x=-(off%12);x<W;x+=12){ctx.fillRect(x+2,GY-2,1,2);ctx.fillRect(x+4,GY-1,1,1);}
+}
+
+function drawSign(s){
+  let sx=Math.round(s.x-cam); if(sx<-50||sx>W+50) return;
+  const sh=s.shake>0? Math.round(Math.sin(s.shake*60)*2):0;
+  const bw=Math.max(56,textW(s.label)+12), bh=20, by=GY-44;
+  ctx.fillStyle='#5a361d';ctx.fillRect(sx-bw/2+8,by+bh,3,GY-by-bh);ctx.fillRect(sx+bw/2-11,by+bh,3,GY-by-bh);
+  const bx=Math.round(sx-bw/2)+sh;
+  ctx.fillStyle='#3a2212';ctx.fillRect(bx-1,by-1,bw+2,bh+2);
+  ctx.fillStyle='#c98d4e';ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle='#ddaa6f';ctx.fillRect(bx,by,bw,2);
+  ctx.fillStyle='#a8703b';ctx.fillRect(bx,by+bh-2,bw,2);ctx.fillRect(bx+2,by+9,bw-4,1);
+  drawText(s.label,bx+bw/2,by+7,1,'#3a2212','center');
+  ctx.fillStyle='#3a2212';ctx.fillRect(bx+2,by+2,1,1);ctx.fillRect(bx+bw-3,by+2,1,1);
+  if(nearSign()===s && !modalOpen){
+    const b=Math.round(Math.abs(Math.sin(t*5))*3);
+    drawOutlined("HIT!",sx,by-17-b,1,'#ffffff','#b3243a','center');
+    ctx.fillStyle='#b3243a';ctx.fillRect(sx-2,by-8-b,5,1);ctx.fillRect(sx-1,by-7-b,3,1);ctx.fillRect(sx,by-6-b,1,1);
+  }
+}
+
+function drawFlag(){
+  const sx=Math.round(FLAG_X-cam); if(sx<-140||sx>W+140) return;
+  ctx.fillStyle='#3a2212';ctx.fillRect(sx,GY-52,2,52);
+  const wv=Math.round(Math.sin(t*4)*1);
+  ctx.fillStyle='#b3243a';ctx.fillRect(sx+2,GY-52+wv,16,10);ctx.fillStyle='#ffffff';ctx.fillRect(sx+7,GY-49+wv,2,1);ctx.fillRect(sx+10,GY-49+wv,2,1);ctx.fillRect(sx+7,GY-48+wv,5,2);ctx.fillRect(sx+8,GY-46+wv,3,1);ctx.fillRect(sx+9,GY-45+wv,1,1);
+  ctx.fillStyle='#ffd447';ctx.fillRect(sx-1,GY-54,4,2);
+  if(Math.abs(p.x-FLAG_X)<120) drawOutlined("THANKS FOR VISITING!",sx,GY-74+Math.round(Math.sin(t*3)*2),1,'#ffffff','#2c3a70','center');
+}
+
+function drawPlayer(){
+  let spr=SPR.idle;
+  if(p.punchT>0) spr=SPR.punch;
+  else if(p.moving){ spr= Math.floor(p.walkT*8)%2? SPR.walk1:SPR.walk2; }
+  else if(blinkT<0) spr=SPR.blink;
+  const bob = p.moving && Math.floor(p.walkT*8)%2 ? -1:0;
+  const sx=Math.round(p.x-cam), y=GY-spr.height+bob;
+  ctx.fillStyle='rgba(60,30,40,.25)';ctx.fillRect(sx-6,GY-1,12,2);
+  ctx.save();
+  if(p.face<0){ctx.translate(sx,0);ctx.scale(-1,1);ctx.drawImage(spr,-8,y);}
+  else ctx.drawImage(spr,sx-8,y);
+  ctx.restore();
+}
+
+function drawHUD(){
+  const big = W>=195?2:1, ty=Math.max(10,GY-170);
+  drawOutlined("ATHARI ALTHOMALI",W/2,ty,big,'#ffffff','#2c3a70','center');
+  drawText("DATA SCIENCE STUDENT",W/2,ty+7*big+5,1,'#b3243a','center');
+  if(!moved && Math.sin(t*4)>-0.4) drawOutlined("WALK > AND HIT THE SIGNS!",W/2,Math.max(46,GY-100),1,'#ffffff','#b3243a','center');
+  // progress dots
+  const n=signs.length, dx=10, x0=W/2-(n-1)*dx/2;
+  signs.forEach((s,i)=>{ctx.fillStyle=p.x>=s.x-30?'#b3243a':'#e7b5c4';ctx.fillRect(Math.round(x0+i*dx)-2,H-8,4,4);});
+}
+
+function render(){
+  drawBG();
+  signs.forEach(drawSign);
+  drawFlag();
+  drawPlayer();
+  parts.forEach(q=>{ctx.fillStyle=q.c;ctx.fillRect(Math.round(q.x-cam),Math.round(q.y),2,2);});
+  pows.forEach(q=>drawOutlined("POW!",q.x-cam,q.y,1,'#ffd447','#3a2212','center'));
+  drawHUD();
+}
+
+let last=performance.now();
+function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);render();requestAnimationFrame(loop);}
+
+/* ================= INPUT ================= */
+addEventListener('keydown',e=>{
+  if(modalOpen){ if(e.key==='Escape') closeWin(); return; }
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a'){keys.l=true;e.preventDefault();}
+  if(k==='arrowright'||k==='d'){keys.r=true;e.preventDefault();}
+  if((k===' '||k==='z'||k==='x'||k==='enter') && !e.repeat){hit();e.preventDefault();}
+});
+addEventListener('keyup',e=>{const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a')keys.l=false; if(k==='arrowright'||k==='d')keys.r=false;});
+addEventListener('blur',()=>{keys.l=keys.r=false;});
+function holdBtn(id,key){
+  const b=document.getElementById(id);
+  const on=e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId);}catch(_){}keys[key]=true;b.classList.add('on');};
+  const off=()=>{keys[key]=false;b.classList.remove('on');};
+  b.addEventListener('pointerdown',on);['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,off));
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+}
+holdBtn('bL','l'); holdBtn('bR','r');
+const bH=document.getElementById('bH');
+bH.addEventListener('pointerdown',e=>{e.preventDefault();bH.classList.add('on');hit();});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>bH.addEventListener(ev,()=>bH.classList.remove('on')));
+bH.addEventListener('contextmenu',e=>e.preventDefault());
+
+resize(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
